@@ -43,8 +43,15 @@ def download_sd_model_if_needed():
     if not MODEL_PATH_FOR_DOWNLOAD.exists():
         st.info(f"Downloading Stable Diffusion checkpoint...")
         MODEL_PATH_FOR_DOWNLOAD.parent.mkdir(parents=True, exist_ok=True)
+        
+        # --- NEW: Prepare authentication headers ---
+        hf_token = st.secrets.get("HUGGINGFACE_TOKEN")
+        headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
+        # -------------------------------------------
+
         try:
-            with requests.get(MODEL_URL, stream=True) as r:
+            # --- MODIFIED: Use headers in the request ---
+            with requests.get(MODEL_URL, stream=True, headers=headers) as r:
                 r.raise_for_status()
                 total_size = int(r.headers.get('content-length', 0))
                 progress_bar = st.progress(0, text="Downloading Stable Diffusion Model (4.3 GB)...")
