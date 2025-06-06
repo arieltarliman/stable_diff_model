@@ -15,6 +15,7 @@ safetensors==0.5.3
 pytorch-lightning==2.3.0
 
 # Common numerical and utility libraries
-numpy
+# Pin NumPy to version 1.x to avoid compatibility issues
+numpy<2.0
 pandas
 PyYAML
