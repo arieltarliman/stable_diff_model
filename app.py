@@ -5,6 +5,7 @@ import torch
 import os
 import sys
 import requests
+import traceback
 
 # Set page config as the FIRST Streamlit command
 st.set_page_config(layout="wide", page_title="Stable Diffusion Hub")
@@ -33,28 +34,27 @@ except ImportError as e:
 DEVICE = "cpu"
 
 # --- Function to Download Stable Diffusion Model ---
-MODEL_URL = "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt"
-STABLE_DIFFUSION_MODEL_FILENAME = "v1-5-pruned-emaonly.ckpt"
+# --- UPDATED TO USE THE MORE EFFICIENT .safetensors MODEL ---
+MODEL_URL = "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
+STABLE_DIFFUSION_MODEL_FILENAME = "v1-5-pruned-emaonly.safetensors"
+# -------------------------------------------------------------
 MODEL_PATH_FOR_DOWNLOAD = DATA_DIR / STABLE_DIFFUSION_MODEL_FILENAME
 
 @st.cache_resource
 def download_sd_model_if_needed():
     """Downloads the Stable Diffusion model if it doesn't already exist."""
     if not MODEL_PATH_FOR_DOWNLOAD.exists():
-        st.info(f"Downloading Stable Diffusion checkpoint...")
+        st.info(f"Downloading Stable Diffusion model ({STABLE_DIFFUSION_MODEL_FILENAME})...")
         MODEL_PATH_FOR_DOWNLOAD.parent.mkdir(parents=True, exist_ok=True)
         
-        # --- NEW: Prepare authentication headers ---
         hf_token = st.secrets.get("HUGGINGFACE_TOKEN")
         headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
-        # -------------------------------------------
 
         try:
-            # --- MODIFIED: Use headers in the request ---
             with requests.get(MODEL_URL, stream=True, headers=headers) as r:
                 r.raise_for_status()
                 total_size = int(r.headers.get('content-length', 0))
-                progress_bar = st.progress(0, text="Downloading Stable Diffusion Model (4.3 GB)...")
+                progress_bar = st.progress(0, text=f"Downloading {STABLE_DIFFUSION_MODEL_FILENAME}...")
                 bytes_downloaded = 0
                 with open(MODEL_PATH_FOR_DOWNLOAD, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192 * 16):
@@ -77,21 +77,22 @@ def download_sd_model_if_needed():
 def load_sd_models_cached():
     model_available = download_sd_model_if_needed()
     if not model_available:
-        st.error("Stable Diffusion model checkpoint not available. Cannot proceed.")
         return None, None
     if not sd_components_available:
-        st.error("Stable Diffusion Python components are not loaded. Cannot proceed.")
+        st.error("Stable Diffusion Python components are not loaded.")
         return None, None
     try:
-        tokenizer_path = DATA_DIR / "vocab.json"
-        merges_path = DATA_DIR / "merges.txt"
-        model_file_path = MODEL_PATH_FOR_DOWNLOAD
-        tokenizer = CLIPTokenizer(str(tokenizer_path), merges_file=str(merges_path))
-        models = model_loader.preload_models_from_standard_weights(str(model_file_path), DEVICE)
+        with st.spinner("Loading Stable Diffusion models into memory..."):
+            tokenizer_path = DATA_DIR / "vocab.json"
+            merges_path = DATA_DIR / "merges.txt"
+            model_file_path = MODEL_PATH_FOR_DOWNLOAD
+            tokenizer = CLIPTokenizer(str(tokenizer_path), merges_file=str(merges_path))
+            models = model_loader.preload_models_from_standard_weights(str(model_file_path), DEVICE)
         st.success("✅ Stable Diffusion models loaded successfully.")
         return tokenizer, models
     except Exception as e:
         st.error(f"❌ Error loading Stable Diffusion models: {e}")
+        st.error(traceback.format_exc())
         return None, None
 
 # --- Streamlit App UI ---
@@ -101,7 +102,6 @@ st.markdown("Enter a prompt or upload an image to generate a new image.")
 if not sd_components_available:
     st.error("Stable Diffusion functionality is currently unavailable due to import errors.")
 else:
-    # Load models
     tokenizer, sd_models = load_sd_models_cached()
 
     if tokenizer and sd_models:
@@ -127,7 +127,7 @@ else:
             uploaded_file = st.file_uploader("Upload an Image:", type=["png", "jpg", "jpeg"])
             if uploaded_file:
                 input_image_pil = Image.open(uploaded_file).convert("RGB")
-                st.image(input_image_pil, caption="Uploaded Image", width=300)
+                st.image(input_image_pil, caption="Uploaded Image", width=300, use_column_width='auto')
             strength = st.slider("Strength:", 0.0, 1.0, 0.8, 0.05)
 
         st.sidebar.markdown("---")
@@ -138,7 +138,6 @@ else:
 
         st.markdown("---")
         if st.button("🚀 Generate Image", type="primary"):
-            # UI validation logic...
             with st.spinner("⏳ Generating image... This might take a moment!"):
                 try:
                     output_image_array = pipeline.generate(
@@ -160,3 +159,7 @@ else:
                     st.image(final_image, caption=f"Generated Image (Seed: {seed})", use_column_width=True)
                 except Exception as e:
                     st.error(f"❌ An error occurred during generation: {e}")
+                    st.error(traceback.format_exc())
+    else:
+        st.warning("Models could not be loaded. Please check the logs for errors.")
+
