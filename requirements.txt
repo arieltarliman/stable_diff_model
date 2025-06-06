@@ -1,0 +1,20 @@
+# Use PyTorch's official index for reliable CPU builds
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Core dependencies
+streamlit
+Pillow
+requests
+
+# PyTorch and Transformers based on your Python 3.11 environment
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+transformers==4.33.2
+safetensors==0.5.3
+pytorch-lightning==2.3.0
+
+# Common numerical and utility libraries
+numpy
+pandas
+PyYAML

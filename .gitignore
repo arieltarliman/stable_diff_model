@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Downloaded Stable Diffusion model (managed by app.py)
+pytorch-stable-diffusion-main/data/v1-5-pruned-emaonly.ckpt
+
+# IDE specific folders
+.vscode/
+.idea/
